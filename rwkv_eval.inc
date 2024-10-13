@@ -35,10 +35,16 @@ static void rwkv_eval_graph(struct rwkv_computation_graph & graph, const uint32_
 
     ggml_graph_compute(graph.cgraph.get(), plan);
 
+    // xzl... added below 
+    static int count = 0; 
+    count ++; 
+    if (count == 20)
+        ggml_graph_print(graph.cgraph.get());
+
     free(plan);
 }
 
-// API function.
+// API function.        xzl: called by generate_completion.py
 bool rwkv_eval(struct rwkv_context * ctx, const uint32_t token, const float * state_in, float * state_out, float * logits_out) {
     ctx->last_error = RWKV_ERROR_NONE;
 

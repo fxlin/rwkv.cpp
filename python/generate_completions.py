@@ -10,11 +10,13 @@ from typing import List
 
 # ======================================== Script settings ========================================
 
-prompt: str = """# rwkv.cpp
+# prompt: str = """# rwkv.cpp
 
-This is a port of [BlinkDL/RWKV-LM](https://github.com/BlinkDL/RWKV-LM) to [ggerganov/ggml](https://github.com/ggerganov/ggml).
+# This is a port of [BlinkDL/RWKV-LM](https://github.com/BlinkDL/RWKV-LM) to [ggerganov/ggml](https://github.com/ggerganov/ggml).
 
-Besides the usual **FP32**, it supports **FP16**, **quantized INT4, INT5 and INT8** inference. This project is **focused on CPU**, but cuBLAS is also supported."""
+# Besides the usual **FP32**, it supports **FP16**, **quantized INT4, INT5 and INT8** inference. This project is **focused on CPU**, but cuBLAS is also supported."""
+
+prompt: str = """University of Virginia is a"""
 
 # How many completions to generate.
 generation_count: int = 3

@@ -37,6 +37,8 @@
 static_assert(sizeof(stat::st_size) >= 8, "File offsets should be 64-bit or else rwkv.cpp will not be able to load model files over 2 GB");
 static_assert(sizeof(decltype(ftell(NULL))) >= 8, "File offsets should be 64-bit or else rwkv.cpp will not be able to load model files over 2 GB");
 
+// xzl: why do things like this? just keep everything in a single .cpp file?
+//      .inc seem c code. and this file is cpp... 
 #include "rwkv_error_handling.inc"
 
 #include "rwkv_utilities.inc"
@@ -64,6 +66,7 @@ struct rwkv_context * rwkv_init_from_file(const char * file_path, const uint32_t
 
     ctx->n_threads = n_threads;
 
+    // xzl: code below build graph....
     RWKV_ENSURE_OR_NULL(rwkv_measure_and_build_serial_context(*ctx->model, ctx->serial_graph));
 
     return ctx.release();

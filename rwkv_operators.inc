@@ -1,3 +1,5 @@
+// xzl: why implement all these from scratch?
+
 static void rwkv_validate_tensors_for_custom_unary_op(struct ggml_tensor * dest, const struct ggml_tensor * src) {
     GGML_ASSERT(dest->type == GGML_TYPE_F32);
     GGML_ASSERT(src->type == GGML_TYPE_F32);

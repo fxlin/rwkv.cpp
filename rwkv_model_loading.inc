@@ -53,7 +53,7 @@ struct rwkv_model {
     struct ggml_tensor * ln0_weight;
     struct ggml_tensor * ln0_bias;
 
-    std::unique_ptr<struct rwkv_layer[]> layers;
+    std::unique_ptr<struct rwkv_layer[]> layers;    // xzl: all layers in between...
 
     struct ggml_tensor * ln_out_weight;
     struct ggml_tensor * ln_out_bias;

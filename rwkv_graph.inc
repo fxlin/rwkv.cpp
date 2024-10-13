@@ -1,9 +1,11 @@
+// xzl: defines the key model operators, etc. 
+
 // View tensors of a state of a single layer.
 struct rwkv_layer_state {
-    struct ggml_tensor * ffn_xx;
+    struct ggml_tensor * ffn_xx;            // xzl: input to ffn, att
     struct ggml_tensor * att_xx;
-    // Used in RWKV v4.
-    struct ggml_tensor * att_aa;
+    // Used in RWKV v4.     xzl: not in v5?
+    struct ggml_tensor * att_aa;            
     struct ggml_tensor * att_bb;
     struct ggml_tensor * att_pp;
     // Used in RWKV v5+.
@@ -165,6 +167,7 @@ static struct ggml_tensor * rwkv_att_wkv(
     return ggml_div(ctx, a, b);
 }
 
+// xzl: time mixing ("att"
 static struct ggml_tensor * rwkv_att(struct ggml_context * ctx, struct ggml_tensor * x, struct rwkv_layer layer, struct rwkv_layer_state & state) {
     struct ggml_tensor * x_prev;
     rwkv_carry_x(ctx, layer.ln1_weight, layer.ln1_bias, x, x_prev, state.att_xx);
@@ -178,6 +181,7 @@ static struct ggml_tensor * rwkv_att(struct ggml_context * ctx, struct ggml_tens
     return ggml_mul_mat(ctx, layer.att_output, ggml_mul(ctx, r, wkv));
 }
 
+// xzl: time mixing ("att"
 static struct ggml_tensor * rwkv_att_v5(
     struct ggml_context * ctx,
     struct ggml_tensor * x,
@@ -252,6 +256,7 @@ static struct ggml_tensor * rwkv_att_v5(
 
     state.att_xx = ggml_view_1d(ctx, x, n_embed, n_embed * (sequence_length - 1) * sizeof(float));
 
+    // xzl: projection... the most expensive???
     struct ggml_tensor * r = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_receptance, xr), head_size, 1,         head_count, sequence_length);
     struct ggml_tensor * k = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_key,        xk), 1,         head_size, head_count, sequence_length);
     struct ggml_tensor * v = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_value,      xv), head_size, 1,         head_count, sequence_length);
@@ -320,9 +325,10 @@ static struct ggml_tensor * rwkv_att_v5(
     return ggml_mul_mat(ctx, layer.att_output, x);
 }
 
+// xzl: channel mix ("ffn"
 static struct ggml_tensor * rwkv_ffn(struct ggml_context * ctx, struct ggml_tensor * x, struct rwkv_layer layer, struct rwkv_layer_state & state) {
     struct ggml_tensor * x_prev;
-    rwkv_carry_x(ctx, layer.ln2_weight, layer.ln2_bias, x, x_prev, state.ffn_xx);
+    rwkv_carry_x(ctx, layer.ln2_weight, layer.ln2_bias, x, x_prev, state.ffn_xx);   // xzl: from prev timestep?
 
     // xk = x * time_mix_k + state[5 * i + 1] * (1 - time_mix_k)
     // xk = x * time_mix_k + state[5 * i + 0] * (1 - time_mix_k)
@@ -339,6 +345,7 @@ static struct ggml_tensor * rwkv_ffn(struct ggml_context * ctx, struct ggml_tens
         ggml_mul(ctx, x_prev, rwkv_1_minus_x(ctx, layer.ffn_time_mix_r))
     );
 
+    // xzl: below the ffn projection... D->3.5D->D
     // r = torch.sigmoid(rw @ xr)
     struct ggml_tensor * r = rwkv_sigmoid_inplace(ctx, ggml_mul_mat(ctx, layer.ffn_receptance, xr));
 
@@ -398,6 +405,7 @@ static void rwkv_create_input_and_output_views(
 
 // Serial graph (token-by-token eval)
 
+// xzl: build graph... core function
 // Creates and sets the input and output ggml tensors, builds the computation graph.
 static bool rwkv_build_serial_graph(struct rwkv_model & model, struct rwkv_computation_graph & graph) {
     graph.cgraph.reset(new(std::nothrow) struct ggml_cgraph());
@@ -410,34 +418,36 @@ static bool rwkv_build_serial_graph(struct rwkv_model & model, struct rwkv_compu
     struct ggml_context * ctx = graph.ggml_ctx;
 
     // Creates a 1-element tensor.
-    graph.tokens = ggml_new_i32(ctx, 0);
+    graph.tokens = ggml_new_i32(ctx, 0);            // xzl: out token
 
     size_t vectors_per_layer = model.arch_version_major >= 5 ?
         2 + model.head_size :
-        5;
+        5;      // xzl: the state... 
 
     struct ggml_tensor * input = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embed * vectors_per_layer * n_layer);
     struct ggml_tensor * output = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_embed * vectors_per_layer * n_layer);
 
-    // We collect parts of input state here. Each part is (n_embed) vector.
+    // xzl: following means what...              I cna undersatnd it's the input to the excution. part -- means input, head state (n_embed x head_size), output? 
+    // We collect parts of input state here. Each part is (n_embed) vector.     
     std::unique_ptr<struct rwkv_layer_state[]> inputs(new(std::nothrow) struct rwkv_layer_state[n_layer]);
     RWKV_ASSERT_FALSE_MSG(RWKV_ERROR_ALLOC, inputs.get(), "Failed to allocate input state parts");
 
-    // We collect parts of output state here. Each part is (n_embed) vector.
+    // We collect parts of output state here. Each part is (n_embed) vector.           xzl: see above? 
     std::unique_ptr<struct rwkv_layer_state[]> outputs(new(std::nothrow) struct rwkv_layer_state[n_layer]);
     RWKV_ASSERT_FALSE_MSG(RWKV_ERROR_ALLOC, outputs.get(), "Failed to allocate output state parts");
 
+    // xzl: arrange input/output states by heads?
     rwkv_create_input_and_output_views(ctx, inputs.get(), outputs.get(), input, output, n_layer, n_embed, model.arch_version_major, model.head_count, model.head_size);
 
-    graph.logits = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_vocab);
+    graph.logits = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_vocab);     // xzl: model output...?
 
-    // x = self.w.emb.weight[token]
-    struct ggml_tensor * x = ggml_get_rows(ctx, model.emb, graph.tokens);
+    // x = self.w.emb.weight[token]         xzl: from token to embeddings?
+    struct ggml_tensor * x = ggml_get_rows(ctx, model.emb, graph.tokens);      
 
-    // x = self.layer_norm(x, self.w.blocks[0].ln0)
+    // x = self.layer_norm(x, self.w.blocks[0].ln0)     xzl: ln: layernorm
     x = rwkv_layer_norm(ctx, x, model.ln0_weight, model.ln0_bias);
 
-    for (size_t i = 0; i < n_layer; i++) {
+    for (size_t i = 0; i < n_layer; i++) {   // xzl: all layers
         struct rwkv_layer & layer = model.layers[i];
 
         struct rwkv_layer_state state = inputs[i];
@@ -452,13 +462,14 @@ static bool rwkv_build_serial_graph(struct rwkv_model & model, struct rwkv_compu
                 model.head_size,
                 model.arch_version_minor
             )) :
-            ggml_add_inplace(ctx, x, rwkv_att(ctx, x, layer, state));
+            ggml_add_inplace(ctx, x, rwkv_att(ctx, x, layer, state));       // xzl: att... with residual link??
 
-        x = ggml_add_inplace(ctx, x, rwkv_ffn(ctx, x, layer, state));
+        x = ggml_add_inplace(ctx, x, rwkv_ffn(ctx, x, layer, state));       // xzl: ffn...
 
         struct rwkv_layer_state & output_state = outputs[i];
 
-        ggml_build_forward_expand(graph.cgraph.get(), ggml_cpy(ctx, state.ffn_xx, output_state.ffn_xx));
+        // xzl: build the graph...  there are multipe parts... build into the same graph? how does this work 
+        ggml_build_forward_expand(graph.cgraph.get(), ggml_cpy(ctx, state.ffn_xx, output_state.ffn_xx)); 
         ggml_build_forward_expand(graph.cgraph.get(), ggml_cpy(ctx, state.att_xx, output_state.att_xx));
 
         if (model.arch_version_major >= 5) {
@@ -524,6 +535,7 @@ static bool rwkv_measure_and_build_serial_context(struct rwkv_model & model, str
 
 // Sequential graph
 
+// xzl: udnerstand this better  -- whats key diff vs serial graph?
 // Creates and sets the input and output ggml tensors, builds the computation graph.
 static bool rwkv_build_sequential_graph(struct rwkv_model & model, struct rwkv_computation_graph & graph, const size_t sequence_length) {
     graph.cgraph.reset(new(std::nothrow) struct ggml_cgraph());

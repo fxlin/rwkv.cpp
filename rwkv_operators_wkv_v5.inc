@@ -34,6 +34,9 @@
     #define MULTADD(x, y, z) x * y + z
 //#endif
 
+// xzl: wkv op... not a common op
+// above ^^ simd intrinics not used at all???  and this op is not executed with multi threads??
+
 // Ported from https://github.com/harrisonvanderbyl/RNN-Factory/blob/3b696b547cc9e25de04a077602c3fe1133d8984c/src/models/modules/cuda/cpuonly.cpp#L57
 // Original code by Harrison Vanderbyl.
 static void rwkv_wkv_v5_impl(struct ggml_tensor * result, const struct ggml_tensor * src, int ith, int nth, void * userdata) {
