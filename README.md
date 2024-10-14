@@ -1,3 +1,6 @@
+FL: rpi5, 0.1b model, ~22 toks/sec (faster than 15 tok/sec pytorch impl)
+
+
 # rwkv.cpp
 
 This is a port of [BlinkDL/RWKV-LM](https://github.com/BlinkDL/RWKV-LM) to [ggerganov/ggml](https://github.com/ggerganov/ggml).
