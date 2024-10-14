@@ -33,16 +33,22 @@ def write_state_dict(state_dict: Dict[str, torch.Tensor], dest_path: str, data_t
     n_embed: int = emb_weight.shape[1]
 
     # xzl: below: guess model version per weight name
-    is_v5_1_or_2: bool = 'blocks.0.att.ln_x.weight' in state_dict
+    is_v5_1_plus: bool = 'blocks.0.att.ln_x.weight' in state_dict
     is_v5_2: bool = 'blocks.0.att.gate.weight' in state_dict
+    is_v5_8_plus: bool = 'blocks.0.att.gate1.weight' in state_dict
+    is_v5_9: bool = 'blocks.0.att.gate_diag.weight' in state_dict
     is_v6_0: bool = 'blocks.0.att.time_maa_x' in state_dict
 
     if is_v6_0:
         print('Detected RWKV v6.0')
+    elif is_v5_9:
+        print('Detected RWKV v5.9')
+    elif is_v5_8_plus:
+        print('Detected RWKV v5.8')
     elif is_v5_2:
         print('Detected RWKV v5.2')
-    elif is_v5_1_or_2:
-        print('Detected RWKV v5.1')
+    elif is_v5_1_plus:
+        print('Detected RWKV v5.1')    
     else:
         print('Detected RWKV v4')
 
@@ -80,9 +86,9 @@ def write_state_dict(state_dict: Dict[str, torch.Tensor], dest_path: str, data_t
                 if '.time_decay' in k and '_w' not in k:
                     tensor = tensor.reshape(n_head, -1, 1)
 
-            elif is_v5_1_or_2:
+            elif is_v5_1_plus:
                 if '.time_decay' in k:
-                    if is_v5_2:
+                    if is_v5_2 or is_v5_8_plus:
                         tensor = torch.exp(-torch.exp(tensor)).unsqueeze(-1)
                     else:
                         tensor = torch.exp(-torch.exp(tensor)).reshape(-1, 1, 1)
@@ -103,6 +109,7 @@ def write_state_dict(state_dict: Dict[str, torch.Tensor], dest_path: str, data_t
             shape = tensor.shape
 
             print(f'Writing {k}, shape {shape}, type {tensor.dtype}')
+            # xzl: below, write meta data (tensor name, shape... to the file)
 
             k_encoded: bytes = k.encode('utf-8')
 
@@ -129,7 +136,7 @@ def main() -> None:
 
     print(f'Reading {args.src_path}')
 
-    state_dict: Dict[str, torch.Tensor] = torch.load(args.src_path, map_location='cpu')
+    state_dict: Dict[str, torch.Tensor] = torch.load(args.src_path, map_location='cpu', weights_only=True)
 
     write_state_dict(state_dict, args.dest_path, args.data_type)
 
