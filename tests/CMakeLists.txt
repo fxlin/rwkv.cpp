@@ -1,9 +1,11 @@
 # xzl  -- VTUNE --
-include_directories("C:\\Program Files (x86)\\Intel\\oneAPI\\vtune\\latest\\sdk\\include")
-link_directories("C:\\Program Files (x86)\\Intel\\oneAPI\\vtune\\latest\\sdk\\lib64\\") # for x64 target
+#include_directories("C:\\Program Files (x86)\\Intel\\oneAPI\\vtune\\latest\\sdk\\include")
+#link_directories("C:\\Program Files (x86)\\Intel\\oneAPI\\vtune\\latest\\sdk\\lib64\\") # for x64 target
+
 # link_directories("C:\\Program Files (x86)\\Intel\\oneAPI\\vtune\\latest\\sdk\\lib32\\") # for x86 target
 
-add_compile_definitions(GGML_USE_VTUNE)
+# xzl
+#add_compile_definitions(GGML_USE_VTUNE)
 
 function(rwkv_add_test source)
     get_filename_component(TEST_TARGET ${source} NAME_WE)
@@ -14,7 +16,8 @@ function(rwkv_add_test source)
     if(RWKV_HIPBLAS)
         target_link_libraries(${TEST_TARGET} PRIVATE ggml-rocm ggml rwkv)
     else()
-        target_link_libraries(${TEST_TARGET} PRIVATE ggml rwkv libittnotify.lib)  # xzl
+        # target_link_libraries(${TEST_TARGET} PRIVATE ggml rwkv libittnotify.lib)  # xzl
+        target_link_libraries(${TEST_TARGET} PRIVATE ggml rwkv)
     endif()
     target_link_libraries(${TEST_TARGET} PRIVATE ggml rwkv)
     add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}> ${ARGN})

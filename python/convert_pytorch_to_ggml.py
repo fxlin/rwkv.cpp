@@ -32,6 +32,7 @@ def write_state_dict(state_dict: Dict[str, torch.Tensor], dest_path: str, data_t
     n_vocab: int = emb_weight.shape[0]
     n_embed: int = emb_weight.shape[1]
 
+    # xzl: below: guess model version per weight name
     is_v5_1_or_2: bool = 'blocks.0.att.ln_x.weight' in state_dict
     is_v5_2: bool = 'blocks.0.att.gate.weight' in state_dict
     is_v6_0: bool = 'blocks.0.att.time_maa_x' in state_dict
@@ -65,6 +66,7 @@ def write_state_dict(state_dict: Dict[str, torch.Tensor], dest_path: str, data_t
         for k in state_dict.keys():
             tensor: torch.Tensor = state_dict[k].float()
 
+            # xzl: version-specific handling of "time" weights... we only have to follow 5.2
             if '.time_' in k:
                 tensor = tensor.squeeze()
 

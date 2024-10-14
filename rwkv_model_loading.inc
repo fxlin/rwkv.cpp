@@ -1,3 +1,4 @@
+// xzl: weights tensors of a layer 
 struct rwkv_layer {
     struct ggml_tensor * ln1_weight;
     struct ggml_tensor * ln1_bias;
@@ -69,7 +70,7 @@ struct rwkv_model {
     int64_t head_count;
     int64_t head_size;
 
-    struct ggml_tensor * emb;
+    struct ggml_tensor * emb;       // xzl: "emb" weight 
 
     struct ggml_tensor * ln0_weight;
     struct ggml_tensor * ln0_bias;
@@ -79,7 +80,7 @@ struct rwkv_model {
     struct ggml_tensor * ln_out_weight;
     struct ggml_tensor * ln_out_bias;
 
-    struct ggml_tensor * head;
+    struct ggml_tensor * head;      // xzl: "head" weight (cls) 
 
     // How many layers were offloaded to the GPU.
     // Model head is counted as an additional layer,
@@ -102,6 +103,9 @@ struct rwkv_file {
     }
 };
 
+// xzl: go through the model and alloc memory for all weights 
+//      "callback" allocates the tensor. arg1 is weight name (used as key for weights), arg2 is the tensor out
+//      (a complex mechinam..
 // https://stackoverflow.com/a/6458689
 template<typename F>
 static bool rwkv_set_params(struct rwkv_model & model, F callback, const uint32_t n_gpu_layers) {
@@ -230,6 +234,9 @@ static bool rwkv_load_model_from_file(const char * file_path, struct rwkv_model 
     struct ggml_tensor * tensor;
 
     // Read all tensor information from the file first.
+    //  xzl: "dry run" iterate over all tensors in the model file, get info (names, dims), and 
+    //      set to the corresponding ggml tensor objs (e.g. dims) 
+    //      1st pass of file read...
     auto tensors_file_start = ftell(file.file);
     while ((size_t) ftell(file.file) < (size_t) file_stat.st_size) {
         RWKV_ASSERT_FALSE_MSG(RWKV_ERROR_MODEL_PARAMS, 
@@ -239,6 +246,7 @@ static bool rwkv_load_model_from_file(const char * file_path, struct rwkv_model 
         parameters[std::move(name)] = tensor;
     }
 
+    // xzl: below: guess model version per weight names
     model.arch_version_major = 4;
     model.arch_version_minor = 0;
 
@@ -311,8 +319,10 @@ static bool rwkv_load_model_from_file(const char * file_path, struct rwkv_model 
     ));
 
     // Read tensor data.
+    // xzl: ... from disk. seems to assume that in the tensor file, all tensors are stored in order. 
+    //  first rwkv_tensor_header, then name (string), then data
     fseek(file.file, tensors_file_start, SEEK_SET);
-    while ((size_t) ftell(file.file) < (size_t) file_stat.st_size) {
+    while ((size_t) ftell(file.file) < (size_t) file_stat.st_size) {  // xzl: iterate through all tensors in the file
         RWKV_ASSERT_FALSE_MSG(RWKV_ERROR_MODEL_PARAMS, 
             rwkv_fread_ggml_tensor_data(file.file, model.ggml_ctx, parameters_ref),
             "Failed to read a model parameter");

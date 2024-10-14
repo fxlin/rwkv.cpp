@@ -42,7 +42,7 @@ void test_on_prompt(const char * prompt, const size_t prompt_length) {
 
     // struct rwkv_context * ctx = rwkv_init_from_file("tiny-rwkv-5v2-730K-FP32.bin", 2);
     // struct rwkv_context * ctx = rwkv_init_from_file("d:\\workspace-rwkv\\RWKV-5-World-0.1B-v1-20230803-ctx4096.bin", NUM_THREADS);
-    struct rwkv_context * ctx = rwkv_init_from_file("d:\\workspace-rwkv\\RWKV-5-World-3B-v2-20231113-ctx4096.bin", NUM_THREADS);
+    struct rwkv_context * ctx = rwkv_init_from_file("d:\\workspace-rwkv\\RWKV-5-World-3B-v2-20231113-ctx4096.bin", NUM_THREADS, 0 /*num layers for gpu*/);
 
     printf("xzl: model loading done\n");
 

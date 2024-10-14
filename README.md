@@ -173,6 +173,10 @@ python python\generate_completions.py C:\rwkv.cpp-169M-Q5_1.bin
 
 # Linux / MacOS
 python python/generate_completions.py ~/Downloads/rwkv.cpp-169M-Q5_1.bin
+
+#
+python3 python/generate_completions.py /data/models/pi-deployment/RWKV-5-World-0.1B-v1-20230803-ctx4096.bin
+
 ```
 
 To chat with a bot, run:

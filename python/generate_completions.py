@@ -10,13 +10,13 @@ from typing import List
 
 # ======================================== Script settings ========================================
 
-# prompt: str = """# rwkv.cpp
+prompt: str = """# rwkv.cpp
 
-# This is a port of [BlinkDL/RWKV-LM](https://github.com/BlinkDL/RWKV-LM) to [ggerganov/ggml](https://github.com/ggerganov/ggml).
+This is a port of [BlinkDL/RWKV-LM](https://github.com/BlinkDL/RWKV-LM) to [ggerganov/ggml](https://github.com/ggerganov/ggml).
 
-# Besides the usual **FP32**, it supports **FP16**, **quantized INT4, INT5 and INT8** inference. This project is **focused on CPU**, but cuBLAS is also supported."""
+Besides the usual **FP32**, it supports **FP16**, **quantized INT4, INT5 and INT8** inference. This project is **focused on CPU**, but cuBLAS is also supported."""
 
-prompt: str = """University of Virginia is a"""
+prompt: str = "\nAlice was so tired when she got back home so she went"
 
 # How many completions to generate.
 generation_count: int = 3
@@ -69,4 +69,4 @@ for GENERATION in range(generation_count):
 
     delay: float = time.time() - start
 
-    print(']\n\nTook %.3f sec, %d ms per token' % (delay, delay / tokens_per_generation * 1000))
+    print(']\n\nTook %.3f sec, %d ms per token %.2f toks/sec' % (delay, delay / tokens_per_generation * 1000, tokens_per_generation/delay))

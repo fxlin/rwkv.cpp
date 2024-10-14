@@ -124,7 +124,7 @@ static bool rwkv_fwrite_file_header(FILE * file, const struct rwkv_file_header &
 }
 
 // rwkv_tensor_header
-
+// xzl: inc tensor dims
 struct rwkv_tensor_header {
     uint32_t dim_count;
     uint32_t key_length;
@@ -228,6 +228,7 @@ static bool rwkv_fread_ggml_tensor_info(FILE * file, struct ggml_context * ctx, 
         name.c_str()
     );
 
+    // xzl: init tensors with specific dims...
     if (header.dim_count == 1) {
         tensor = ggml_new_tensor_1d(ctx, ggml_type, header.size0);
     } else if (header.dim_count == 2) {
@@ -238,6 +239,7 @@ static bool rwkv_fread_ggml_tensor_info(FILE * file, struct ggml_context * ctx, 
 
     RWKV_ASSERT_FALSE_MSG(RWKV_ERROR_ALLOC, tensor != NULL, "Failed to allocate tensor");
 
+    // xzl: set the tensor name.....
     ggml_set_name(tensor, name.c_str());
 
     RWKV_ASSERT_FALSE_MSG(
@@ -250,6 +252,8 @@ static bool rwkv_fread_ggml_tensor_info(FILE * file, struct ggml_context * ctx, 
     return true;
 }
 
+// xzl: read a tensor from the curretn file position. parameters can be unorderd, but will use the "name" from the disk file to index the tensor
+// in "paramters"
 static bool rwkv_fread_ggml_tensor_data(FILE * file, struct ggml_context * ctx, std::unordered_map<std::string, struct ggml_tensor *> & parameters) {
     struct rwkv_tensor_header header;
     std::string name;
@@ -275,16 +279,16 @@ static bool rwkv_fread_ggml_tensor_data(FILE * file, struct ggml_context * ctx, 
         name.c_str()
     );
 
-    char * data = (char *) malloc(rwkv_tensor_nbytes(tensor));
+    char * data = (char *) malloc(rwkv_tensor_nbytes(tensor));  // xzl: a temp buffer to read this weight tensor?
 
     RWKV_ASSERT_FALSE_MSG(
         RWKV_ERROR_FILE_READ,
-        rwkv_fread_data(file, rwkv_tensor_nbytes(tensor), data),
+        rwkv_fread_data(file, rwkv_tensor_nbytes(tensor), data),    // xzl: read the tensor data from the file...
         "Failed to read data of parameter %s",
         name.c_str()
     );
 
-    ggml_backend_tensor_set(tensor, data, 0, rwkv_tensor_nbytes(tensor));
+    ggml_backend_tensor_set(tensor, data, 0, rwkv_tensor_nbytes(tensor));   // xzl: copy the data to the tensor
 
     free(data);
 
