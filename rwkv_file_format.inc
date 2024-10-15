@@ -233,6 +233,7 @@ static bool rwkv_fread_ggml_tensor_info(FILE * file, struct ggml_context * ctx, 
         tensor = ggml_new_tensor_1d(ctx, ggml_type, header.size0);
     } else if (header.dim_count == 2) {
         tensor = ggml_new_tensor_2d(ctx, ggml_type, header.size0, header.size1);
+        printf("2d tensor %s: ne0 %d x ne1 %d\n", name.c_str(), header.size0, header.size1);
     } else {
         tensor = ggml_new_tensor_3d(ctx, ggml_type, header.size0, header.size1, header.size2);
     }
@@ -254,7 +255,7 @@ static bool rwkv_fread_ggml_tensor_info(FILE * file, struct ggml_context * ctx, 
 
 // xzl: read a tensor from the curretn file position. parameters can be unorderd, but will use the "name" from the disk file to index the tensor
 // in "paramters"
-static bool rwkv_fread_ggml_tensor_data(FILE * file, struct ggml_context * ctx, std::unordered_map<std::string, struct ggml_tensor *> & parameters) {
+static bool rwkv_fread_ggml_tensor_data(FILE * file, [[maybe_unused]] struct ggml_context * ctx, std::unordered_map<std::string, struct ggml_tensor *> & parameters) {
     struct rwkv_tensor_header header;
     std::string name;
     RWKV_ENSURE_OR_FALSE_MSG(rwkv_fread_tensor_header(file, header), "Invalid tensor header");
@@ -289,6 +290,9 @@ static bool rwkv_fread_ggml_tensor_data(FILE * file, struct ggml_context * ctx, 
     );
 
     ggml_backend_tensor_set(tensor, data, 0, rwkv_tensor_nbytes(tensor));   // xzl: copy the data to the tensor
+
+    // xzl: transpose the tensor if needed, so we can do matmul 
+    // if (name.find("2.weight") != std::string::npos) {
 
     free(data);
 

@@ -10,10 +10,31 @@ struct rwkv_layer {
     // Removed in RWKV v5.2; set to NULL for this and newer models.
     struct ggml_tensor * att_time_first;
     struct ggml_tensor * att_time_decay;
+
+    // xzl: v5.1 v5.2
     struct ggml_tensor * att_key;
     struct ggml_tensor * att_value;
     struct ggml_tensor * att_receptance;
     struct ggml_tensor * att_output;
+
+    // xzl: v5.8 & 5.9
+    struct ggml_tensor * att_key1;
+    struct ggml_tensor * att_key2;
+    struct ggml_tensor * att_value1;
+    struct ggml_tensor * att_value2;
+    struct ggml_tensor * att_receptance1;
+    struct ggml_tensor * att_receptance2;
+    struct ggml_tensor * att_gate1;
+    struct ggml_tensor * att_gate2;
+    // struct ggml_tensor * att_output1;    // we dont decompose this
+    // struct ggml_tensor * att_output2;
+
+    // xzl: v5.9 only 
+    struct ggml_tensor * att_key_diag;
+    struct ggml_tensor * att_value_diag;
+    struct ggml_tensor * att_receptance_diag;
+    struct ggml_tensor * att_gate_diag;
+    // struct ggml_tensor * att_output_diag;
 
     // Added in RWKV v5.1; set to NULL for earlier models (v4).
     struct ggml_tensor * att_ln_x_weight;
@@ -49,7 +70,16 @@ struct rwkv_layer {
 
     struct ggml_tensor * ffn_key;
     struct ggml_tensor * ffn_value;
+
+    // xzl: v5.1 v5.2
     struct ggml_tensor * ffn_receptance;
+
+    // xzl: v5.8 & 5.9
+    struct ggml_tensor * ffn_receptance1;
+    struct ggml_tensor * ffn_receptance2;
+
+    // xzl: v5.9 only
+    struct ggml_tensor * ffn_receptance_diag;
 };
 
 // The model holds all parameter tensors and the ggml context containing them.
@@ -104,7 +134,7 @@ struct rwkv_file {
 };
 
 // xzl: go through the model and alloc memory for all weights 
-//      "callback" allocates the tensor. arg1 is weight name (used as key for weights), arg2 is the tensor out
+//      "callback" are inline funcs. below: allocates the tensor. arg1 is weight name (used as key for weights), arg2 is the tensor out
 //      (a complex mechinam..
 // https://stackoverflow.com/a/6458689
 template<typename F>
@@ -123,7 +153,8 @@ static bool rwkv_set_params(struct rwkv_model & model, F callback, const uint32_
     model.layers = std::move(layers);
 
     for (uint32_t i = 0; i < n_layer; i++) {
-        bool offload_layer = (i < n_gpu);
+        bool offload_layer = (i < n_gpu);       
+        // xzl: <<< offload gpu, optionally offload?   offload_default: no offload, cpu?
         char buffer[128];
         size_t offset = sprintf(buffer, "blocks.%" PRId32 ".", i);
 
@@ -170,10 +201,44 @@ static bool rwkv_set_params(struct rwkv_model & model, F callback, const uint32_
 
             RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.time_decay"), buffer), layer.att_time_decay, offload_default));
 
-            RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.key.weight"), buffer), layer.att_key, offload_default));
-            RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.value.weight"), buffer), layer.att_value, offload_default));
-            RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.receptance.weight"), buffer), layer.att_receptance, offload_default));
-            RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.output.weight"), buffer), layer.att_output, offload_layer));
+            if (model.arch_version_major >= 5 && model.arch_version_minor == 8) {   // ours x58
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.key1.weight"), buffer), layer.att_key1, offload_default));
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.key2.weight"), buffer), layer.att_key2, offload_default));
+                
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.value1.weight"), buffer), layer.att_value1, offload_default));
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.value2.weight"), buffer), layer.att_value2, offload_default));
+                
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.receptance1.weight"), buffer), layer.att_receptance1, offload_default));
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.receptance2.weight"), buffer), layer.att_receptance2, offload_default));
+                
+                // NB: offload_layer, inherited the orig code
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.output.weight"), buffer), layer.att_output, offload_layer)); 
+                // RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.output1.weight"), buffer), layer.att_output1, offload_layer)); 
+                // RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.output2.weight"), buffer), layer.att_output2, offload_layer));
+            } else if (model.arch_version_major >= 5 && model.arch_version_minor == 9) {   // ours x59
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.key1.weight"), buffer), layer.att_key1, offload_default));
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.key2.weight"), buffer), layer.att_key2, offload_default));
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.key_diag.weight"), buffer), layer.att_key2, offload_default));
+                
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.value1.weight"), buffer), layer.att_value1, offload_default));
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.value2.weight"), buffer), layer.att_value2, offload_default));
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.value_diag.weight"), buffer), layer.att_value2, offload_default));
+
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.receptance1.weight"), buffer), layer.att_receptance1, offload_default));
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.receptance2.weight"), buffer), layer.att_receptance2, offload_default));
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.receptance_diag.weight"), buffer), layer.att_receptance2, offload_default));
+
+                // NB: offload_layer, inherited the orig code
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.output.weight"), buffer), layer.att_output, offload_layer)); 
+                // RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.output1.weight"), buffer), layer.att_output1, offload_layer)); 
+                // RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.output2.weight"), buffer), layer.att_output2, offload_layer));
+                // RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.output_diag.weight"), buffer), layer.att_output2, offload_layer));
+            } else { // default x51, x52
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.key.weight"), buffer), layer.att_key, offload_default));
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.value.weight"), buffer), layer.att_value, offload_default));
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.receptance.weight"), buffer), layer.att_receptance, offload_default));
+                RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.output.weight"), buffer), layer.att_output, offload_layer));
+            }
 
             if (model.arch_version_major >= 5) {
                 RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.ln_x.weight"), buffer), layer.att_ln_x_weight, offload_default));
@@ -181,12 +246,22 @@ static bool rwkv_set_params(struct rwkv_model & model, F callback, const uint32_
 
                 if (model.arch_version_minor >= 2) {
                     RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.time_mix_g"), buffer), layer.att_time_mix_g, offload_default));
-                    RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.gate.weight"), buffer), layer.att_gate, offload_layer));
+
+                    if (model.arch_version_minor == 2)
+                        RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.gate.weight"), buffer), layer.att_gate, offload_layer));
+                    else if (model.arch_version_minor == 8) {
+                        RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.gate1.weight"), buffer), layer.att_gate1, offload_layer));
+                        RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.gate2.weight"), buffer), layer.att_gate2, offload_layer));
+                    } else if (model.arch_version_minor == 9) {
+                        RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.gate1.weight"), buffer), layer.att_gate1, offload_layer));
+                        RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.gate2.weight"), buffer), layer.att_gate2, offload_layer));
+                        RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "att.gate_diag.weight"), buffer), layer.att_gate_diag, offload_layer));
+                    }
                 }
             }
         }
 
-
+        // --- xzl: ffn -----//
         if (model.arch_version_major == 6) {
             RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "ln2.weight"), buffer), layer.ln2_weight, offload_layer));
             RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "ln2.bias"), buffer), layer.ln2_bias, offload_layer));
@@ -201,7 +276,16 @@ static bool rwkv_set_params(struct rwkv_model & model, F callback, const uint32_
 
         RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "ffn.key.weight"), buffer), layer.ffn_key, offload_layer));
         RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "ffn.value.weight"), buffer), layer.ffn_value, offload_layer));
-        RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "ffn.receptance.weight"), buffer), layer.ffn_receptance, offload_layer));
+
+        if (model.arch_version_major == 5 && model.arch_version_minor == 8) {   // 0x58 ours
+            RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "ffn.receptance1.weight"), buffer), layer.ffn_receptance1, offload_layer));
+            RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "ffn.receptance2.weight"), buffer), layer.ffn_receptance2, offload_layer));
+        } else if (model.arch_version_major == 5 && model.arch_version_minor == 9) { // 0x59 ours
+            RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "ffn.receptance1.weight"), buffer), layer.ffn_receptance1, offload_layer));
+            RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "ffn.receptance2.weight"), buffer), layer.ffn_receptance2, offload_layer));
+            RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "ffn.receptance_diag.weight"), buffer), layer.ffn_receptance_diag, offload_layer));
+        } else  // default x51, x52
+            RWKV_ENSURE_OR_FALSE(callback((strcpy(&buffer[offset], "ffn.receptance.weight"), buffer), layer.ffn_receptance, offload_layer));
     }
 
     RWKV_ENSURE_OR_FALSE(callback("ln_out.weight", model.ln_out_weight, offload_head));
@@ -242,11 +326,13 @@ static bool rwkv_load_model_from_file(const char * file_path, struct rwkv_model 
         RWKV_ASSERT_FALSE_MSG(RWKV_ERROR_MODEL_PARAMS, 
             rwkv_fread_ggml_tensor_info(file.file, model.ggml_ctx, name, tensor), // dry_run = true
             "Failed to read a model parameter");
-
+        // printf("++++++++ Reading tensor %s\n", name.c_str());
         parameters[std::move(name)] = tensor;
     }
 
     // xzl: below: guess model version per weight names
+    // cf convert_pytorch_to_ggml.py
+    // default guess
     model.arch_version_major = 4;
     model.arch_version_minor = 0;
 
@@ -258,6 +344,12 @@ static bool rwkv_load_model_from_file(const char * file_path, struct rwkv_model 
         } else {
             model.arch_version_minor = 1;
         }
+        // xzl: override the minor version...
+        if (parameters.find("blocks.0.att.gate1.weight") != parameters.end())
+            model.arch_version_minor = 8;
+        if (parameters.find("blocks.0.att.gate_diag.weight") != parameters.end())
+            model.arch_version_minor = 9;
+        // TODO: add more checks
     }
 
     if (parameters.find("blocks.0.att.time_maa_x") != parameters.end()) {
@@ -310,6 +402,7 @@ static bool rwkv_load_model_from_file(const char * file_path, struct rwkv_model 
         [&](const char * key, struct ggml_tensor *& dest, bool offload_gpu) {
             struct ggml_tensor * tensor = parameters_ref[key];
             RWKV_ENSURE_OR_FALSE_MSG(tensor, "Model parameter %s not found", key);
+            // printf(">>>> Allocating tensor %s\n", key);
             ggml_tallocr * alloc = offload_gpu ? &model.tallocrs.front() : &model.tallocrs.back();
             ggml_tallocr_alloc(alloc, tensor);
             dest = tensor;
@@ -319,7 +412,7 @@ static bool rwkv_load_model_from_file(const char * file_path, struct rwkv_model 
     ));
 
     // Read tensor data.
-    // xzl: ... from disk. seems to assume that in the tensor file, all tensors are stored in order. 
+    // xzl: ... from disk. assume that in the ggml model file, all tensors are stored back to back
     //  first rwkv_tensor_header, then name (string), then data
     fseek(file.file, tensors_file_start, SEEK_SET);
     while ((size_t) ftell(file.file) < (size_t) file_stat.st_size) {  // xzl: iterate through all tensors in the file

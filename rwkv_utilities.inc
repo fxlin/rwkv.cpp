@@ -33,7 +33,7 @@ static bool rwkv_fread_uint32(FILE * file, uint32_t & dest) {
 // Reads a single string value from a file.
 static bool rwkv_fread_string(FILE * file, const size_t length, std::string & dest) {
     dest.resize(length);
-    return fread((void *) dest.data(), length, 1, file) == 1;
+    return fread(const_cast<char*>(dest.data()), length, 1, file) == 1;
 }
 
 // Reads a single data buffer from a file.

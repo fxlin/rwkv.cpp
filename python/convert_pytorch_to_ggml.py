@@ -98,6 +98,13 @@ def write_state_dict(state_dict: Dict[str, torch.Tensor], dest_path: str, data_t
 
                 if '.time_faaaa' in k:
                     tensor = tensor.unsqueeze(-1)
+
+                # xzl: weight like att.key2.weight shall be transposed here. b/c ggml_matmul() does A@B^T
+                # https://github.com/ggerganov/llama.cpp/discussions/5098
+                # if 'key2.weight' in k or 'value2.weight' in k \
+                #     or 'receptance2.weight' in k or 'gate2.weight' in k:
+                #     print(f'Transposing {k}')
+                #     tensor = tensor.transpose(0, 1).contiguous()
             else:
                 if '.time_decay' in k:
                     tensor = -torch.exp(tensor)

@@ -153,6 +153,8 @@ if (NOT MSVC)
     if (RWKV_NATIVE)
         add_compile_options(-march=native)
     endif()
+
+    add_compile_options(-g)  # xzl debug info 
 endif()
 
 #

@@ -123,11 +123,11 @@ static struct ggml_tensor * rwkv_wkv_v5(
     GGML_ASSERT(ggml_is_contiguous(time_decay));
     GGML_ASSERT(ggml_is_contiguous(state));
 
-    GGML_ASSERT(x->ne[0] == C && x->ne[1] == T && x->ne[2] == 1 && x->ne[3] == 1);
-    GGML_ASSERT(k->ne[0] == 1 && k->ne[1] == S && k->ne[2] == H && k->ne[3] == T);
-    GGML_ASSERT(v->ne[0] == S && v->ne[1] == 1 && v->ne[2] == H && v->ne[3] == T);
-    GGML_ASSERT(r->ne[0] == S && r->ne[1] == 1 && r->ne[2] == H && r->ne[3] == T);
-    GGML_ASSERT(ggml_nelements(state) == S * S * H);
+    GGML_ASSERT(static_cast<size_t>(x->ne[0]) == C && static_cast<size_t>(x->ne[1]) == T && x->ne[2] == 1 && x->ne[3] == 1);
+    GGML_ASSERT(static_cast<size_t>(k->ne[0]) == 1 && static_cast<size_t>(k->ne[1]) == S && static_cast<size_t>(k->ne[2]) == H && static_cast<size_t>(k->ne[3]) == T);
+    GGML_ASSERT(static_cast<size_t>(v->ne[0]) == S && static_cast<size_t>(v->ne[1]) == 1 && static_cast<size_t>(v->ne[2]) == H && static_cast<size_t>(v->ne[3]) == T);
+    GGML_ASSERT(static_cast<size_t>(r->ne[0]) == S && static_cast<size_t>(r->ne[1]) == 1 && static_cast<size_t>(r->ne[2]) == H && static_cast<size_t>(r->ne[3]) == T);
+    GGML_ASSERT(static_cast<size_t>(ggml_nelements(state)) == S * S * H);
 
     k = ggml_transpose(ctx, k);
     v = ggml_transpose(ctx, v);

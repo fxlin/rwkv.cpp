@@ -41,7 +41,10 @@ library = rwkv_cpp_shared_library.load_rwkv_shared_library()
 print(f'System info: {library.rwkv_get_system_info_string()}')
 
 print('Loading RWKV model')
+# default threadcount = core/2
 model = rwkv_cpp_model.RWKVModel(library, args.model_path, gpu_layers_count=0)
+# not much faster
+# model = rwkv_cpp_model.RWKVModel(library, args.model_path, gpu_layers_count=0, thread_count=4)
 
 tokenizer_decode, tokenizer_encode = get_tokenizer(args.tokenizer, model.n_vocab)
 

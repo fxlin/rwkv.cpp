@@ -312,13 +312,59 @@ static struct ggml_tensor * rwkv_att_v5(
     state.att_xx = ggml_view_1d(ctx, x, n_embed, n_embed * (sequence_length - 1) * sizeof(float));
 
     // xzl: below projection... the most expensive???
-    struct ggml_tensor * r = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_receptance, xr), head_size, 1,         head_count, sequence_length);
-    struct ggml_tensor * k = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_key,        xk), 1,         head_size, head_count, sequence_length);
-    struct ggml_tensor * v = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_value,      xv), head_size, 1,         head_count, sequence_length);
+    // -- orig code -- 
+    // struct ggml_tensor * r = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_receptance, xr), head_size, 1,         head_count, sequence_length);
+    // struct ggml_tensor * k = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_key,        xk), 1,         head_size, head_count, sequence_length);
+    // struct ggml_tensor * v = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_value,      xv), head_size, 1,         head_count, sequence_length);
 
+    struct ggml_tensor * r = NULL; 
+    struct ggml_tensor * k = NULL;
+    struct ggml_tensor * v = NULL;
     struct ggml_tensor * g = NULL;
 
-    if (arch_version_minor >= 2) {
+    if (arch_version_minor == 8) {  // x58
+        struct ggml_tensor * xxr, *xxk, *xxv; // temps
+        // project 1.   
+        // xxr = ggml_mul_mat(ctx, xr, layer.att_receptance1);
+        // xxk = ggml_mul_mat(ctx, xk, layer.att_key1);
+        // xxv = ggml_mul_mat(ctx, xv, layer.att_value1);
+        // NB: ggml_mul_mat(A, B) expects B to be transposed. that is, 
+        // pytorch A @ B == ggml_mul_mat(A, B^T)
+        // the results from ggml_mul_mat is also transposed
+        // xxr = ggml_mul_mat(ctx, layer.att_receptance2,  xr);
+        // xxk = ggml_mul_mat(ctx, layer.att_key2,        xk);
+        // xxv = ggml_mul_mat(ctx, layer.att_value2,       xv);
+
+        xxr = ggml_mul_mat(ctx, layer.att_receptance1,  xr);
+        xxk = ggml_mul_mat(ctx, layer.att_key1,        xk);
+        xxv = ggml_mul_mat(ctx, layer.att_value1,       xv);
+
+        // project 2
+        // r = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_receptance1, xxr), head_size, 1,         head_count, sequence_length);
+        // k = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_key1,        xxk), 1,         head_size, head_count, sequence_length);
+        // v = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_value1,      xxv), head_size, 1,         head_count, sequence_length);
+
+        r = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_receptance2, xxr), head_size, 1,         head_count, sequence_length);
+        k = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_key2,        xxk), 1,         head_size, head_count, sequence_length);
+        v = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_value2,      xxv), head_size, 1,         head_count, sequence_length);
+
+    } else if (arch_version_minor == 9) {   // x59
+        RWKV_ASSERT_MSG(RWKV_ERROR_MODEL, 0, NULL, "TBD");
+    } else {    // v5.1 5.2 fallback 
+        r = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_receptance, xr), head_size, 1,         head_count, sequence_length);
+        k = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_key,        xk), 1,         head_size, head_count, sequence_length);
+        v = ggml_reshape_4d(ctx, ggml_mul_mat(ctx, layer.att_value,      xv), head_size, 1,         head_count, sequence_length);
+    }
+
+    if (arch_version_minor == 8) { // x58
+        g = ggml_silu_inplace(
+            ctx,
+            ggml_mul_mat(ctx, layer.att_gate2, 
+                ggml_mul_mat(ctx, layer.att_gate1, xg))
+        );
+    } else if (arch_version_minor == 9) { // x59
+        RWKV_ASSERT_MSG(RWKV_ERROR_MODEL, 0, NULL, "TBD");
+    } else { // v5.1 5.2 fallback
         g = ggml_silu_inplace(
             ctx,
             ggml_mul_mat(ctx, layer.att_gate, xg)
@@ -595,8 +641,9 @@ static struct ggml_tensor * rwkv_att_v6(
     return ggml_mul_mat(ctx, layer.att_output, x);
 }
 
-// xzl: channel mix ("ffn"
-static struct ggml_tensor * rwkv_ffn(struct ggml_context * ctx, struct ggml_tensor * x, struct rwkv_layer layer, struct rwkv_layer_state & state) {
+// xzl: channel mix ("ffn" ... v5.1-5.9
+static struct ggml_tensor * rwkv_ffn(struct ggml_context * ctx, struct ggml_tensor * x, 
+    struct rwkv_layer layer, struct rwkv_layer_state & state, const uint32_t arch_version_minor) {
     struct ggml_tensor * x_prev;
     rwkv_carry_x(ctx, layer.ln2_weight, layer.ln2_bias, x, x_prev, state.ffn_xx);   // xzl: from prev timestep?
 
@@ -617,7 +664,19 @@ static struct ggml_tensor * rwkv_ffn(struct ggml_context * ctx, struct ggml_tens
 
     // xzl: the "gate" (receptance)
     // r = torch.sigmoid(rw @ xr)
-    struct ggml_tensor * r = ggml_sigmoid_inplace(ctx, ggml_mul_mat(ctx, layer.ffn_receptance, xr));
+    // struct ggml_tensor * r = ggml_sigmoid_inplace(ctx, ggml_mul_mat(ctx, layer.ffn_receptance, xr)); // orig
+    struct ggml_tensor * r;
+    if (arch_version_minor == 8) {  // x58
+        struct ggml_tensor * xxr = ggml_mul_mat(ctx, layer.ffn_receptance1, xr);
+        // printf("xr shape: %d %d\n", xr->ne[0], xr->ne[1]);
+        // printf("xxr shape: %d %d\n", xxr->ne[0], xxr->ne[1]);
+        // printf("ffn_receptance2 shape: %d %d\n", layer.ffn_receptance2->ne[0], layer.ffn_receptance2->ne[1]);
+        r = ggml_sigmoid_inplace(ctx, ggml_mul_mat(ctx, layer.ffn_receptance2, xxr));
+    } else if (arch_version_minor == 9) {   // x59
+        RWKV_ASSERT_MSG(RWKV_ERROR_MODEL, 0, NULL, "TBD");
+    } else { // v5.1 5.2 fallback
+        r = ggml_sigmoid_inplace(ctx, ggml_mul_mat(ctx, layer.ffn_receptance, xr));
+    }
 
     // xzl: below the ffn projection... D->3.5D->D (k,v)
     // k = torch.square(torch.relu(kw @ xk))
@@ -801,7 +860,7 @@ static bool rwkv_build_serial_graph(struct rwkv_model & model, struct rwkv_compu
                 )) :
                 ggml_add(ctx, x, rwkv_att(ctx, x, layer, state));   // xzl: att... with residual link
 
-            x = ggml_add(ctx, x, rwkv_ffn(ctx, x, layer, state));   // xzl: ffn... with residual link
+            x = ggml_add(ctx, x, rwkv_ffn(ctx, x, layer, state, model.arch_version_minor));   // xzl: ffn... with residual link
         }
 
         struct rwkv_layer_state & output_state = outputs[i];
@@ -954,7 +1013,7 @@ static bool rwkv_build_sequential_graph(struct rwkv_model & model, struct rwkv_c
         if (model.arch_version_major == 6) {
             x = ggml_add(ctx, x, rwkv_ffn_v6(ctx, x, layer, state));
         } else {
-            x = ggml_add(ctx, x, rwkv_ffn(ctx, x, layer, state));
+            x = ggml_add(ctx, x, rwkv_ffn(ctx, x, layer, state, model.arch_version_minor));
         }
 
         struct rwkv_layer_state & output_state = outputs[i];

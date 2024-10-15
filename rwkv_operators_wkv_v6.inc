@@ -120,12 +120,12 @@ static struct ggml_tensor * rwkv_wkv_v6(
     GGML_ASSERT(ggml_is_contiguous(w));
     GGML_ASSERT(ggml_is_contiguous(state));
 
-    GGML_ASSERT(x->ne[0] == C && x->ne[1] == T && x->ne[2] == 1 && x->ne[3] == 1);
-    GGML_ASSERT(k->ne[0] == 1 && k->ne[1] == S && k->ne[2] == H && k->ne[3] == T);
-    GGML_ASSERT(v->ne[0] == S && v->ne[1] == 1 && v->ne[2] == H && v->ne[3] == T);
-    GGML_ASSERT(r->ne[0] == S && r->ne[1] == 1 && r->ne[2] == H && r->ne[3] == T);
-    GGML_ASSERT(w->ne[0] == 1 && w->ne[1] == S && w->ne[2] == H && w->ne[3] == T);
-    GGML_ASSERT(ggml_nelements(state) == S * S * H);
+    GGML_ASSERT(x->ne[0] == (int64_t)C && x->ne[1] == (int64_t)T && x->ne[2] == 1 && x->ne[3] == 1);
+    GGML_ASSERT(k->ne[0] == 1 && k->ne[1] == (int64_t)S && k->ne[2] == (int64_t)H && k->ne[3] == (int64_t)T);
+    GGML_ASSERT(v->ne[0] == (int64_t)S && v->ne[1] == 1 && v->ne[2] == (int64_t)H && v->ne[3] == (int64_t)T);
+    GGML_ASSERT(r->ne[0] == (int64_t)S && r->ne[1] == 1 && r->ne[2] == (int64_t)H && r->ne[3] == (int64_t)T);
+    GGML_ASSERT(w->ne[0] == 1 && w->ne[1] == (int64_t)S && w->ne[2] == (int64_t)H && w->ne[3] == (int64_t)T);
+    GGML_ASSERT(ggml_nelements(state) == (int64_t)(S * S * H));
 
     k = ggml_transpose(ctx, k);
     v = ggml_transpose(ctx, v);
