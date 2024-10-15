@@ -11,6 +11,8 @@ cmake --build . --config Debug -j4
 
 cmake --build . --config Debug -j4 --target rwkv
 
+# win 10. build ok from  git console 
+
 ## model conversion
 # default fp16
 python3 python/convert_pytorch_to_ggml.py \
