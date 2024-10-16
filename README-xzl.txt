@@ -11,6 +11,11 @@ cmake --build . --config Debug -j4
 
 cmake --build . --config Debug -j4 --target rwkv
 
+
+mkdir build-win && cd build-win
+
+
+
 # win 10. build ok from  git console 
 
 ## model conversion
