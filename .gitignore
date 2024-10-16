@@ -45,3 +45,7 @@ Makefile
 bin/*
 
 *.so
+
+*vcxproj*
+*.sln
+**/*.dir/

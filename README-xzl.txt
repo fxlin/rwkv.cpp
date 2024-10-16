@@ -11,7 +11,16 @@ cmake --build . --config Debug -j4
 
 cmake --build . --config Debug -j4 --target rwkv
 
+<<<<<<< HEAD
 cmake --build .. --config Debug -j4 --target rwkv
+=======
+
+mkdir build-win && cd build-win
+
+
+
+# win 10. build ok from  git console 
+>>>>>>> 05ae468d212b81ec4c184b7bc71221b5185d3084
 
 ## model conversion
 # default fp16
