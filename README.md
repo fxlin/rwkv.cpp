@@ -77,7 +77,8 @@ Note: same as cuBLAS, hipBLAS only supports `ggml_mul_mat()`, we still need to u
 **Requirements**: [git](https://gitforwindows.org/).
 
 ```commandline
-git clone --recursive https://github.com/saharNooby/rwkv.cpp.git
+# git clone --recursive https://github.com/saharNooby/rwkv.cpp.git
+git clone --recursive https://github.com/fxlin/rwkv.cpp
 cd rwkv.cpp
 ```
 
